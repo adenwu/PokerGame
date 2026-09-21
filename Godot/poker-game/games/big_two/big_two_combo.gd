@@ -2,7 +2,7 @@ class_name BigTwoCombo
 extends RefCounted
 ## A valid Big Two play (single, pair or five-card hand) with a comparable key.
 
-# Ordered weakest to strongest; five-card hands compare by this order first.
+# Ordered weakest to strongest. Only the last two can beat a different type (see beats()).
 enum Type { SINGLE, PAIR, STRAIGHT, FLUSH, FULL_HOUSE, FOUR_OF_A_KIND, STRAIGHT_FLUSH }
 
 const TYPE_NAMES: Array[String] = ["single", "pair", "straight", "flush", "full house", "four of a kind", "straight flush"]
@@ -101,7 +101,8 @@ func _straight_order() -> int:
 	return -1
 
 
-## 1 if this beats other, -1 if it loses, 0 if equal. Both must have the same card count.
+## Raw ordering (type first, then key): 1 if greater, -1 if lesser, 0 if equal.
+## Used for sorting; use beats() to decide whether a play is legal.
 func compare(other: BigTwoCombo) -> int:
 	if type != other.type:
 		return 1 if type > other.type else -1
@@ -111,8 +112,16 @@ func compare(other: BigTwoCombo) -> int:
 	return 0
 
 
+## Same card count and same type are required, except for the two "bombs":
+## four of a kind beats any other five-card hand, and a straight flush beats everything.
 func beats(other: BigTwoCombo) -> bool:
-	return cards.size() == other.cards.size() and compare(other) > 0
+	if cards.size() != other.cards.size():
+		return false
+	if type == other.type:
+		return compare(other) > 0
+	if type == Type.STRAIGHT_FLUSH:
+		return true
+	return type == Type.FOUR_OF_A_KIND and other.type != Type.STRAIGHT_FLUSH
 
 
 func _to_string() -> String:
