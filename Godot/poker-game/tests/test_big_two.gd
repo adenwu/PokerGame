@@ -10,6 +10,7 @@ func _init() -> void:
 	test_straight_order()
 	test_five_card_order()
 	test_rules()
+	test_translations()
 	test_simulated_games()
 	print("FAILED: %d" % failures if failures > 0 else "ALL PASSED")
 	quit(1 if failures > 0 else 0)
@@ -116,6 +117,17 @@ func test_rules() -> void:
 	check(BigTwoRules.penalty(eleven) == 220, "more than 10 cards doubles the penalty")
 	var plays := BigTwoRules.find_plays(hand("3C 3D 4C 5H 9S"), combo("4D"))
 	check(plays.size() == 2 and plays.all(func(c: BigTwoCombo) -> bool: return c.cards.size() == 1), "only bigger singles beat a single")
+
+
+func test_translations() -> void:
+	var english: Dictionary = I18n.TEXTS["en"]
+	var chinese: Dictionary = I18n.TEXTS["zh_TW"]
+	for key in english:
+		check(chinese.has(key), "zh_TW has translation for '%s'" % key)
+	for key in chinese:
+		check(english.has(key), "en has translation for '%s'" % key)
+	for type_index in BigTwoCombo.TYPE_NAMES.size():
+		check(english.has("type_%d" % type_index), "combo type %d is translated" % type_index)
 
 
 func test_simulated_games() -> void:

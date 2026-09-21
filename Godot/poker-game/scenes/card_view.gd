@@ -10,6 +10,7 @@ const BLACK := Color(0.1, 0.1, 0.1)
 func setup(card: Card, card_size: Vector2) -> void:
 	custom_minimum_size = card_size
 	size = card_size
+	pivot_offset = card_size * 0.5  # rotate and scale around the center
 	focus_mode = Control.FOCUS_NONE
 	alignment = HORIZONTAL_ALIGNMENT_LEFT  # overlapped hand cards only show their left edge
 	text = "%s\n%s" % [Card.RANK_NAMES[card.rank], SUIT_SYMBOLS[card.suit]]
