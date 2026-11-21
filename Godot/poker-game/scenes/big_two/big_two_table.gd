@@ -73,10 +73,7 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
-	var background := ColorRect.new()
-	background.color = Color(0.09, 0.35, 0.2)
-	background.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(background)
+	add_child(FeltBackground.new())
 
 	for i in player_count:
 		var label := Label.new()
