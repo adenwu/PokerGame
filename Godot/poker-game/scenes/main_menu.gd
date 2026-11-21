@@ -4,7 +4,7 @@ extends Control
 ##   2. Game list: pick a game (e.g. Big Two).
 ##   3. That game's options (number of players), then start playing.
 
-enum Page { HOME, GAMES, OPTIONS }
+enum Page { HOME, GAMES, OPTIONS, RULES }
 
 const SELECTED_COLOR := Color(1.0, 0.9, 0.3)
 
@@ -38,6 +38,9 @@ var level_prev: Button
 var level_next: Button
 var start_button: Button
 var back_button: Button
+var rules_button: Button
+var rules_page: PanelContainer
+var rules_text: RichTextLabel
 var language_button: Button
 
 
@@ -136,6 +139,28 @@ func _build_ui() -> void:
 	start_button.pressed.connect(_on_start_pressed)
 	options_page.add_child(_centered(start_button))
 
+	rules_button = Button.new()
+	rules_button.custom_minimum_size = Vector2(200, 44)
+	rules_button.add_theme_font_size_override("font_size", 20)
+	rules_button.pressed.connect(_show_page.bind(Page.RULES))
+	options_page.add_child(_centered(rules_button))
+
+	# Step 4 (optional): how to play the chosen game; Back returns to its options.
+	rules_page = PanelContainer.new()
+	var rules_style := StyleBoxFlat.new()
+	rules_style.bg_color = Color(0.03, 0.1, 0.06, 0.85)
+	rules_style.set_corner_radius_all(12)
+	rules_style.set_content_margin_all(20)
+	rules_page.add_theme_stylebox_override("panel", rules_style)
+	rules_page.custom_minimum_size = Vector2(820, 430)
+	column.add_child(rules_page)
+	rules_text = RichTextLabel.new()
+	rules_text.bbcode_enabled = true
+	rules_text.scroll_active = true
+	rules_text.add_theme_font_size_override("normal_font_size", 19)
+	rules_text.add_theme_constant_override("line_separation", 4)
+	rules_page.add_child(rules_text)
+
 	# Back goes one step up; it sits below whichever page is showing.
 	back_button = Button.new()
 	back_button.custom_minimum_size = Vector2(160, 44)
@@ -197,6 +222,8 @@ func _refresh() -> void:
 	home_page.visible = page == Page.HOME
 	game_page.visible = page == Page.GAMES
 	options_page.visible = page == Page.OPTIONS
+	rules_page.visible = page == Page.RULES
+	title_label.add_theme_font_size_override("font_size", 44 if page == Page.RULES else 72)
 	back_button.get_parent().visible = page != Page.HOME
 	language_button.text = I18n.t("language_button")
 	back_button.text = I18n.t("back")
@@ -211,8 +238,13 @@ func _refresh() -> void:
 			title_label.text = I18n.t("choose_game")
 			for i in GAMES.size():
 				game_buttons[i].text = I18n.t(GAMES[i]["title"])
+		Page.RULES:
+			title_label.text = I18n.t("rules_title") % I18n.t(GAMES[chosen_game]["title"])
+			rules_text.text = RulesTexts.for_game(GAMES[chosen_game]["title"])
+			rules_text.scroll_to_line(0)
 		Page.OPTIONS:
 			title_label.text = I18n.t(GAMES[chosen_game]["title"])
+			rules_button.text = I18n.t("view_rules")
 			players_label.text = I18n.t("players")
 			start_button.text = I18n.t("start")
 			var game_entry: Dictionary = GAMES[chosen_game]
@@ -262,7 +294,13 @@ func _on_game_pressed(index: int) -> void:
 
 
 func _on_back_pressed() -> void:
-	_show_page(Page.GAMES if page == Page.OPTIONS else Page.HOME)
+	match page:
+		Page.RULES:
+			_show_page(Page.OPTIONS)
+		Page.OPTIONS:
+			_show_page(Page.GAMES)
+		_:
+			_show_page(Page.HOME)
 
 
 func _on_count_pressed(count: int) -> void:

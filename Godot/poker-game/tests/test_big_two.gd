@@ -122,6 +122,14 @@ func test_rules() -> void:
 
 
 func test_translations() -> void:
+	# Every game on the start screen has rules in both languages.
+	var menu_script: GDScript = load("res://scenes/main_menu.gd")
+	for game_entry in menu_script.GAMES:
+		for locale in ["zh_TW", "en"]:
+			var sections: Array = RulesTexts.TEXTS[locale].get(game_entry["title"], [])
+			check(sections.size() >= 3, "%s has %s rules" % [game_entry["title"], locale])
+		check(RulesTexts.TEXTS["zh_TW"][game_entry["title"]].size() == RulesTexts.TEXTS["en"][game_entry["title"]].size(),
+			"%s rules have the same sections in both languages" % game_entry["title"])
 	var saved_locale := I18n.locale
 	GameSettings._values["ui/locale"] = ""  # as if nothing was ever saved
 	I18n.locale = ""
