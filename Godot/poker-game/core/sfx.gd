@@ -87,6 +87,8 @@ func _build_sounds() -> void:
 	# Not a legal play: low buzz.
 	_streams["illegal"] = _make(0.18, func(t: float) -> float:
 		return (1.0 if sin(TAU * 140.0 * t) > 0.0 else -1.0) * _env(t, 0.005, 0.18) * 0.18)
+	# Three tiles matched: quick bright two-note chime.
+	_streams["match"] = _notes([1046.5, 1568.0], 0.07, 0.3)
 	# Countdown tick.
 	_streams["tick"] = _make(0.06, func(t: float) -> float:
 		return sin(TAU * 1050.0 * t) * _env(t, 0.001, 0.06) * 0.35)

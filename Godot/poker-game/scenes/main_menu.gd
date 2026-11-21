@@ -8,11 +8,13 @@ enum Page { HOME, GAMES, OPTIONS }
 
 const SELECTED_COLOR := Color(1.0, 0.9, 0.3)
 
-# Games on the game list: title key, the table scene it opens, and either a
-# choice of player counts (saved in GameSettings) or a fixed count.
+# Games on the game list: title key, the table scene it opens, and its options:
+# "players" = a choice of player counts (saved in GameSettings) or one fixed count,
+# "levels" = pick a level (single-player puzzles).
 const GAMES := [
 	{"title": "game_big_two", "scene": "res://scenes/big_two/big_two_table.tscn", "players": [3, 4]},
 	{"title": "game_dou_di_zhu", "scene": "res://scenes/dou_di_zhu/dou_di_zhu_table.tscn", "players": [3]},
+	{"title": "game_tile_stack", "scene": "res://scenes/tile_stack/tile_stack_table.tscn", "levels": true},
 ]
 
 var page := Page.HOME
@@ -28,6 +30,12 @@ var game_buttons: Array[Button] = []
 var options_page: VBoxContainer
 var players_label: Label
 var count_buttons: Dictionary = {}  # player count -> Button
+var count_row: HBoxContainer
+var level_row: HBoxContainer
+var level_title: Label
+var level_value: Label
+var level_prev: Button
+var level_next: Button
 var start_button: Button
 var back_button: Button
 var language_button: Button
@@ -90,7 +98,7 @@ func _build_ui() -> void:
 	options_page.add_theme_constant_override("separation", 28)
 	column.add_child(options_page)
 
-	var count_row := HBoxContainer.new()
+	count_row = HBoxContainer.new()
 	count_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	count_row.add_theme_constant_override("separation", 16)
 	options_page.add_child(count_row)
@@ -105,6 +113,24 @@ func _build_ui() -> void:
 		button.pressed.connect(_on_count_pressed.bind(count))
 		count_row.add_child(button)
 		count_buttons[count] = button
+
+	level_row = HBoxContainer.new()
+	level_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	level_row.add_theme_constant_override("separation", 16)
+	options_page.add_child(level_row)
+	level_title = Label.new()
+	level_title.add_theme_font_size_override("font_size", 24)
+	level_row.add_child(level_title)
+	level_prev = _arrow_button("◀", -1)
+	level_row.add_child(level_prev)
+	level_value = Label.new()
+	level_value.custom_minimum_size = Vector2(130, 0)
+	level_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	level_value.add_theme_font_size_override("font_size", 26)
+	level_value.add_theme_color_override("font_color", SELECTED_COLOR)
+	level_row.add_child(level_value)
+	level_next = _arrow_button("▶", 1)
+	level_row.add_child(level_next)
 
 	start_button = _big_button()
 	start_button.pressed.connect(_on_start_pressed)
@@ -124,6 +150,20 @@ func _build_ui() -> void:
 	language_button.position = Vector2(-130, 16)
 	language_button.pressed.connect(_on_language_pressed)
 	add_child(language_button)
+
+
+func _arrow_button(text: String, step: int) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(56, 48)
+	button.add_theme_font_size_override("font_size", 22)
+	button.pressed.connect(_on_level_step.bind(step))
+	return button
+
+
+func _on_level_step(step: int) -> void:
+	GameSettings.set_tile_level(GameSettings.tile_level() + step)
+	_refresh()
 
 
 func _switch_button(handler: Callable) -> Button:
@@ -175,7 +215,18 @@ func _refresh() -> void:
 			title_label.text = I18n.t(GAMES[chosen_game]["title"])
 			players_label.text = I18n.t("players")
 			start_button.text = I18n.t("start")
-			var choices: Array = GAMES[chosen_game]["players"]
+			var game_entry: Dictionary = GAMES[chosen_game]
+			level_row.visible = game_entry.get("levels", false)
+			count_row.visible = game_entry.has("players")
+			if level_row.visible:
+				var level := GameSettings.tile_level()
+				level_title.text = I18n.t("level")
+				level_value.text = I18n.t("level_n") % level
+				level_prev.disabled = level <= 1
+				level_next.disabled = level >= GameSettings.tile_level_unlocked()
+			if not count_row.visible:
+				return
+			var choices: Array = game_entry["players"]
 			var chosen: int = GameSettings.player_count() if choices.size() > 1 else choices[0]
 			for count in count_buttons:
 				var button: Button = count_buttons[count]

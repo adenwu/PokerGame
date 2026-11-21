@@ -61,7 +61,7 @@ var button_row: HBoxContainer
 var play_button: Button
 var pass_button: Button
 var menu_button: Button
-var result_panel: PanelContainer
+var result_panel: ResultWindow
 var result_title: Label
 var result_body: Label
 var countdown_label: Label
@@ -213,52 +213,15 @@ func _build_ui() -> void:
 
 ## The window that opens when a round ends: result, continue, or back to the start screen.
 func _build_result_panel() -> void:
-	result_panel = PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.05, 0.12, 0.08)
-	style.border_color = ACTIVE_COLOR
-	style.set_border_width_all(3)
-	style.set_corner_radius_all(14)
-	style.set_content_margin_all(28)
-	result_panel.add_theme_stylebox_override("panel", style)
-	result_panel.visible = false
+	result_panel = ResultWindow.new()
 	add_child(result_panel)
-
-	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 14)
-	result_panel.add_child(column)
-
-	result_title = Label.new()
-	result_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	result_title.add_theme_font_size_override("font_size", 34)
-	result_title.add_theme_color_override("font_color", ACTIVE_COLOR)
-	column.add_child(result_title)
-
-	result_body = Label.new()
-	result_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	result_body.add_theme_font_size_override("font_size", 22)
-	column.add_child(result_body)
-
-	countdown_label = Label.new()
-	countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	countdown_label.add_theme_font_size_override("font_size", 18)
-	countdown_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.75))
-	column.add_child(countdown_label)
-
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 16)
-	column.add_child(row)
-	continue_button = Button.new()
-	continue_button.custom_minimum_size = Vector2(150, 48)
-	continue_button.add_theme_font_size_override("font_size", 22)
+	result_title = result_panel.title_label
+	result_body = result_panel.body_label
+	countdown_label = result_panel.countdown_label
+	continue_button = result_panel.continue_button
+	result_menu_button = result_panel.menu_button
 	continue_button.pressed.connect(_start_round)
-	row.add_child(continue_button)
-	result_menu_button = Button.new()
-	result_menu_button.custom_minimum_size = Vector2(170, 48)
-	result_menu_button.add_theme_font_size_override("font_size", 22)
 	result_menu_button.pressed.connect(_go_to_menu)
-	row.add_child(result_menu_button)
 
 
 func _make_button(handler: Callable) -> Button:
@@ -332,8 +295,7 @@ func _layout_static() -> void:
 
 
 func _layout_result_panel() -> void:
-	result_panel.reset_size()
-	result_panel.position = (size - result_panel.size) * 0.5
+	result_panel.center_in(size)
 
 
 func _layout_hand(duration: float, stagger: float = 0.0) -> void:

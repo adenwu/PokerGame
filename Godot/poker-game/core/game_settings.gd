@@ -39,6 +39,24 @@ static func set_music_enabled(on: bool) -> void:
 	_write("audio", "music", on)
 
 
+## 疊牌消消: the level to play next, and the highest level reached so far.
+static func tile_level() -> int:
+	return clampi(_read("tile_stack", "level", 1), 1, tile_level_unlocked())
+
+
+static func set_tile_level(level: int) -> void:
+	_write("tile_stack", "level", clampi(level, 1, tile_level_unlocked()))
+
+
+static func tile_level_unlocked() -> int:
+	return maxi(_read("tile_stack", "unlocked", 1), 1)
+
+
+static func unlock_tile_level(level: int) -> void:
+	if level > tile_level_unlocked():
+		_write("tile_stack", "unlocked", level)
+
+
 static func locale() -> String:
 	return _read("ui", "locale", "")
 
