@@ -10,7 +10,6 @@ const TEXTS := {
 	"en": {
 		"play": "Play",
 		"pass": "Pass",
-		"new_game": "New Game",
 		"language_button": "中文",
 		"seat_0": "You",
 		"seat_1": "Right",
@@ -28,7 +27,19 @@ const TEXTS := {
 		"win_you": "You win!",
 		"win_other": "%s wins.",
 		"score": "Score: %s",
-		"next_round": "Next Round",
+		"app_title": "Board Games",
+		"choose_game": "Choose a game",
+		"game_big_two": "Big Two",
+		"back": "Back",
+		"players": "Players",
+		"players_n": "%d players",
+		"start": "Start",
+		"menu": "Menu",
+		"continue": "Continue",
+		"back_to_menu": "Back to Menu",
+		"round_over": "Round %d over",
+		"countdown": "Returning to the start screen in %d s...",
+		"result_line": "%s    this round %+d    total %+d",
 		"round": "Round %d",
 		"totals": "Totals",
 		"leading": "leading",
@@ -43,7 +54,6 @@ const TEXTS := {
 	"zh_TW": {
 		"play": "出牌",
 		"pass": "Pass",
-		"new_game": "新遊戲",
 		"language_button": "English",
 		"seat_0": "你",
 		"seat_1": "右家",
@@ -61,7 +71,19 @@ const TEXTS := {
 		"win_you": "你贏了！",
 		"win_other": "%s 獲勝",
 		"score": "得分：%s",
-		"next_round": "下一局",
+		"app_title": "Board Games",
+		"choose_game": "選擇遊戲",
+		"game_big_two": "大老二",
+		"back": "返回",
+		"players": "人數",
+		"players_n": "%d 人",
+		"start": "開始遊戲",
+		"menu": "選單",
+		"continue": "繼續",
+		"back_to_menu": "回到開始畫面",
+		"round_over": "第 %d 局結束",
+		"countdown": "%d 秒後回到開始畫面…",
+		"result_line": "%s　　本局 %+d　　總分 %+d",
 		"round": "第 %d 局",
 		"totals": "總分",
 		"leading": "領先",
@@ -87,6 +109,7 @@ static func t(key: String) -> String:
 static func toggle() -> void:
 	locale = "en" if current() == "zh_TW" else "zh_TW"
 	var config := ConfigFile.new()
+	config.load(SETTINGS_PATH)  # keep the other saved settings (e.g. player count)
 	config.set_value("ui", "locale", locale)
 	config.save(SETTINGS_PATH)
 

@@ -2,6 +2,8 @@ class_name Deck
 extends RefCounted
 ## A standard 52-card deck.
 
+const SIZE := 52
+
 var cards: Array[Card] = []
 
 

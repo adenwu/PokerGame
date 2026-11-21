@@ -1,10 +1,13 @@
 extends Control
-## Big Two table: you sit at the bottom, three computer players take turns
-## counterclockwise (right, top, left). Every hand is drawn as a fan of cards.
+## Big Two table: you sit at the bottom and the computer players take turns
+## counterclockwise (right, top, left; with 3 players only right and left).
+## Every hand is drawn as a fan of cards.
 
 const HUMAN := 0
-const PLAYER_COUNT := 4
 const AI_DELAY := 0.9
+const MENU_SCENE := "res://scenes/main_menu.tscn"
+const RESULT_DELAY := 1.2  # time to see the winning play before the result window opens
+const COUNTDOWN_SECONDS := 5
 
 const CARD_SIZE := Vector2(76, 108)
 const BACK_SIZE := Vector2(50, 72)
@@ -16,6 +19,9 @@ const HAND_RADIUS := 1300.0
 const HAND_SPACING := 50.0
 const OPPONENT_RADIUS := 420.0
 const OPPONENT_SPACING := 20.0
+# Longest a fan may get (arc length); bigger hands (17 cards with 3 players) are squeezed to fit.
+const HAND_MAX_SPAN := 620.0
+const OPPONENT_MAX_SPAN := 240.0
 const SELECT_LIFT := 34.0
 
 const MOVE_TIME := 0.25
@@ -23,11 +29,14 @@ const FLY_TIME := 0.35
 const DEAL_STAGGER := 0.03
 const ACTIVE_COLOR := Color(1.0, 0.9, 0.3)
 
-# Direction each seat's cards face (toward the table center), in radians.
+# Screen slots: 0 bottom, 1 right, 2 top, 3 left. Players map onto them by player count.
+const SLOTS_BY_COUNT := {3: [0, 1, 3], 4: [0, 1, 2, 3]}
+# Direction each slot's cards face (toward the table center), in radians.
 const SEAT_FACING: Array[float] = [0.0, -PI / 2.0, PI, PI / 2.0]
 
 var game := BigTwoGame.new()
-var series := BigTwoMatch.new(PLAYER_COUNT)
+var player_count := GameSettings.player_count()
+var series := BigTwoMatch.new(player_count)
 var round_recorded := false  # the finished round's scores were added to `series`
 var selected: Array[Card] = []
 var last_action_key := ""
@@ -45,8 +54,13 @@ var scoreboard_label: Label
 var button_row: HBoxContainer
 var play_button: Button
 var pass_button: Button
-var next_round_button: Button
-var new_game_button: Button
+var menu_button: Button
+var result_panel: PanelContainer
+var result_title: Label
+var result_body: Label
+var countdown_label: Label
+var continue_button: Button
+var result_menu_button: Button
 var language_button: Button
 var hand_layer: Control
 var table_layer: Control
@@ -64,7 +78,7 @@ func _build_ui() -> void:
 	background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
 
-	for i in PLAYER_COUNT:
+	for i in player_count:
 		var label := Label.new()
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.add_theme_font_size_override("font_size", 22)
@@ -89,8 +103,7 @@ func _build_ui() -> void:
 	add_child(button_row)
 	play_button = _make_button(_on_play_pressed)
 	pass_button = _make_button(_on_pass_pressed)
-	next_round_button = _make_button(_start_round)
-	new_game_button = _make_button(_start_game)
+	menu_button = _make_button(_go_to_menu)
 
 	scoreboard_label = Label.new()
 	scoreboard_label.add_theme_font_size_override("font_size", 18)
@@ -111,6 +124,58 @@ func _build_ui() -> void:
 	table_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(table_layer)
 
+	_build_result_panel()
+
+
+## The window that opens when a round ends: result, continue, or back to the start screen.
+func _build_result_panel() -> void:
+	result_panel = PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.05, 0.12, 0.08)
+	style.border_color = ACTIVE_COLOR
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(14)
+	style.set_content_margin_all(28)
+	result_panel.add_theme_stylebox_override("panel", style)
+	result_panel.visible = false
+	add_child(result_panel)
+
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 14)
+	result_panel.add_child(column)
+
+	result_title = Label.new()
+	result_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	result_title.add_theme_font_size_override("font_size", 34)
+	result_title.add_theme_color_override("font_color", ACTIVE_COLOR)
+	column.add_child(result_title)
+
+	result_body = Label.new()
+	result_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	result_body.add_theme_font_size_override("font_size", 22)
+	column.add_child(result_body)
+
+	countdown_label = Label.new()
+	countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	countdown_label.add_theme_font_size_override("font_size", 18)
+	countdown_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.75))
+	column.add_child(countdown_label)
+
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 16)
+	column.add_child(row)
+	continue_button = Button.new()
+	continue_button.custom_minimum_size = Vector2(150, 48)
+	continue_button.add_theme_font_size_override("font_size", 22)
+	continue_button.pressed.connect(_start_round)
+	row.add_child(continue_button)
+	result_menu_button = Button.new()
+	result_menu_button.custom_minimum_size = Vector2(170, 48)
+	result_menu_button.add_theme_font_size_override("font_size", 22)
+	result_menu_button.pressed.connect(_go_to_menu)
+	row.add_child(result_menu_button)
+
 
 func _make_button(handler: Callable) -> Button:
 	var button := Button.new()
@@ -123,8 +188,16 @@ func _make_button(handler: Callable) -> Button:
 
 # --- Layout -----------------------------------------------------------------
 
+func _slot(player: int) -> int:
+	return SLOTS_BY_COUNT[player_count][player]
+
+
+func _seat_name(player: int) -> String:
+	return I18n.t("seat_%d" % _slot(player))
+
+
 func _seat_anchor(seat: int) -> Vector2:
-	match seat:
+	match _slot(seat):
 		1:
 			return Vector2(size.x - 75.0, size.y * 0.42)
 		2:
@@ -142,7 +215,9 @@ func _table_center() -> Vector2:
 func _fan_pose(seat: int, index: int, count: int) -> Array:
 	var radius := HAND_RADIUS if seat == HUMAN else OPPONENT_RADIUS
 	var spacing := HAND_SPACING if seat == HUMAN else OPPONENT_SPACING
-	var facing := SEAT_FACING[seat]
+	if count > 1:
+		spacing = minf(spacing, (HAND_MAX_SPAN if seat == HUMAN else OPPONENT_MAX_SPAN) / (count - 1))
+	var facing := SEAT_FACING[_slot(seat)]
 	var angle := facing + (index - (count - 1) * 0.5) * spacing / radius
 	var pivot := _seat_anchor(seat) - Vector2.UP.rotated(facing) * radius
 	return [pivot + Vector2.UP.rotated(angle) * radius, angle]
@@ -151,7 +226,7 @@ func _fan_pose(seat: int, index: int, count: int) -> Array:
 func _on_resized() -> void:
 	_layout_static()
 	_layout_hand(0.0)
-	for seat in range(1, PLAYER_COUNT):
+	for seat in range(1, player_count):
 		_layout_backs(seat, 0.0)
 	_layout_table(0.0)
 
@@ -166,9 +241,15 @@ func _layout_static() -> void:
 	language_button.position = Vector2(size.x - 130.0, 16)
 
 	seat_labels[0].position = Vector2(20.0, size.y - 130.0)
-	seat_labels[1].position = _seat_anchor(1) + Vector2(-75.0, 165.0)
-	seat_labels[2].position = _seat_anchor(2) + Vector2(-75.0, 45.0)
-	seat_labels[3].position = _seat_anchor(3) + Vector2(-75.0, 165.0)
+	for seat in range(1, player_count):
+		var below := 45.0 if _slot(seat) == 2 else 165.0
+		seat_labels[seat].position = _seat_anchor(seat) + Vector2(-75.0, below)
+	_layout_result_panel()
+
+
+func _layout_result_panel() -> void:
+	result_panel.reset_size()
+	result_panel.position = (size - result_panel.size) * 0.5
 
 
 func _layout_hand(duration: float, stagger: float = 0.0) -> void:
@@ -231,11 +312,13 @@ func _start_game() -> void:
 func _start_round() -> void:
 	run_id += 1
 	round_recorded = false
+	result_panel.visible = false
+	status_label.visible = true
 	selected.clear()
 	_set_action("")
-	game.start(PLAYER_COUNT)
+	game.start(player_count)
 	if game.is_over():
-		_set_action("act_dragon", [I18n.t("seat_%d" % game.winner)])
+		_set_action("act_dragon", [_seat_name(game.winner)])
 
 	_clear_all_cards()
 	_layout_static()
@@ -252,7 +335,7 @@ func _clear_all_cards() -> void:
 	table_views.clear()
 	back_views.clear()
 	back_views.append([])
-	for seat in range(1, PLAYER_COUNT):
+	for seat in range(1, player_count):
 		var backs: Array = []
 		back_views.append(backs)
 
@@ -269,7 +352,7 @@ func _deal_animation() -> void:
 		_move(view, from_center, 0.0, Vector2.ONE * 0.3, 0.0)
 	_layout_hand(0.5, DEAL_STAGGER)
 
-	for seat in range(1, PLAYER_COUNT):
+	for seat in range(1, player_count):
 		for i in game.hand_of(seat).size():
 			var back := CardBackView.new()
 			back.setup(BACK_SIZE)
@@ -305,7 +388,7 @@ func _on_play_pressed() -> void:
 	_place_on_table(views)
 	_layout_hand(MOVE_TIME)
 
-	_set_action("act_played", [I18n.t("seat_%d" % HUMAN)])
+	_set_action("act_played", [_seat_name(HUMAN)])
 	_refresh()
 	_run_ai_turns()
 
@@ -315,7 +398,7 @@ func _on_pass_pressed() -> void:
 		# Picked-up cards drop back into the fan.
 		selected.clear()
 		_layout_hand(MOVE_TIME)
-		_set_action("act_passed", [I18n.t("seat_%d" % HUMAN)])
+		_set_action("act_passed", [_seat_name(HUMAN)])
 		_refresh()
 		_run_ai_turns()
 
@@ -330,11 +413,11 @@ func _run_ai_turns() -> void:
 	while not game.is_over() and game.current_player != HUMAN:
 		_refresh_controls()
 		await get_tree().create_timer(AI_DELAY).timeout
-		if my_run != run_id:
+		if my_run != run_id or game.is_over():
 			return
 		var player := game.current_player
 		var cards := BigTwoAI.choose_play(game, player)
-		var seat_name := I18n.t("seat_%d" % player)
+		var seat_name := _seat_name(player)
 		if cards.is_empty():
 			game.pass_turn(player)
 			_set_action("act_passed", [seat_name])
@@ -398,9 +481,9 @@ func _refresh() -> void:
 
 
 func _refresh_table() -> void:
-	for i in PLAYER_COUNT:
+	for i in player_count:
 		var count_text := I18n.t("cards_left") % game.hand_of(i).size()
-		seat_labels[i].text = "%s\n%s" % [I18n.t("seat_%d" % i), count_text]
+		seat_labels[i].text = "%s\n%s" % [_seat_name(i), count_text]
 		var active := i == game.current_player and not game.is_over()
 		seat_labels[i].add_theme_color_override("font_color", ACTIVE_COLOR if active else Color.WHITE)
 
@@ -408,14 +491,15 @@ func _refresh_table() -> void:
 		last_play_label.text = I18n.t("new_round")
 		_clear_table()
 	else:
-		last_play_label.text = "%s: %s" % [I18n.t("seat_%d" % game.last_player), I18n.t("type_%d" % game.last_combo.type)]
+		last_play_label.text = "%s: %s" % [_seat_name(game.last_player), I18n.t("type_%d" % game.last_combo.type)]
 
 
 func _refresh_controls() -> void:
 	play_button.text = I18n.t("play")
 	pass_button.text = I18n.t("pass")
-	new_game_button.text = I18n.t("new_game")
-	next_round_button.text = I18n.t("next_round")
+	menu_button.text = I18n.t("menu")
+	continue_button.text = I18n.t("continue")
+	result_menu_button.text = I18n.t("back_to_menu")
 	language_button.text = I18n.t("language_button")
 
 	var my_turn := not game.is_over() and game.current_player == HUMAN
@@ -423,7 +507,6 @@ func _refresh_controls() -> void:
 	pass_button.disabled = not my_turn or game.last_combo == null
 	play_button.visible = not game.is_over()
 	pass_button.visible = not game.is_over()
-	next_round_button.visible = game.is_over()
 
 	var action := ""
 	if not last_action_key.is_empty():
@@ -434,7 +517,7 @@ func _refresh_controls() -> void:
 	elif my_turn:
 		second_line = I18n.t("hint_lead" if game.last_combo == null else "hint_beat")
 	else:
-		second_line = I18n.t("thinking") % I18n.t("seat_%d" % game.current_player)
+		second_line = I18n.t("thinking") % _seat_name(game.current_player)
 	status_label.text = "%s\n%s" % [action, second_line]
 
 
@@ -442,6 +525,32 @@ func _record_round_if_over() -> void:
 	if game.is_over() and not round_recorded:
 		series.record(game.scores())
 		round_recorded = true
+		_show_result_after_delay()
+
+
+## Opens the result window, then counts down and returns to the start screen
+## unless the player presses Continue (which starts a new run and stops this one).
+func _show_result_after_delay() -> void:
+	var my_run := run_id
+	await get_tree().create_timer(RESULT_DELAY).timeout
+	if my_run != run_id:
+		return
+	result_title.text = I18n.t("round_over") % (series.round_number() - 1)
+	result_body.text = _result_details()
+	result_panel.visible = true
+	status_label.visible = false  # the window shows the same result; avoid text peeking out around it
+	for left in range(COUNTDOWN_SECONDS, 0, -1):
+		countdown_label.text = I18n.t("countdown") % left
+		_layout_result_panel()
+		await get_tree().create_timer(1.0).timeout
+		if my_run != run_id:
+			return
+	_go_to_menu()
+
+
+func _go_to_menu() -> void:
+	run_id += 1  # stops the AI loop and any countdown
+	get_tree().change_scene_to_file(MENU_SCENE)
 
 
 func _refresh_scoreboard() -> void:
@@ -451,17 +560,29 @@ func _refresh_scoreboard() -> void:
 	var lines: Array[String] = ["%s · %s" % [I18n.t("round") % shown_round, I18n.t("totals")]]
 	var leader := series.leader()
 	var entries: Array[String] = []
-	for i in PLAYER_COUNT:
-		entries.append("%s %+d%s" % [I18n.t("seat_%d" % i), series.totals[i], " ★" if i == leader else ""])
+	for i in player_count:
+		entries.append("%s %+d%s" % [_seat_name(i), series.totals[i], " ★" if i == leader else ""])
 	for i in range(0, entries.size(), 2):
 		lines.append("   ".join(entries.slice(i, i + 2)))
 	scoreboard_label.text = "\n".join(lines)
 
 
+func _result_headline() -> String:
+	return I18n.t("win_you") if game.winner == HUMAN else I18n.t("win_other") % _seat_name(game.winner)
+
+
 func _result_text() -> String:
 	var scores := game.scores()
 	var parts: Array[String] = []
-	for i in PLAYER_COUNT:
-		parts.append("%s %+d" % [I18n.t("seat_%d" % i), scores[i]])
-	var headline := I18n.t("win_you") if game.winner == HUMAN else I18n.t("win_other") % I18n.t("seat_%d" % game.winner)
-	return "%s  %s" % [headline, I18n.t("score") % "  ".join(parts)]
+	for i in player_count:
+		parts.append("%s %+d" % [_seat_name(i), scores[i]])
+	return "%s  %s" % [_result_headline(), I18n.t("score") % "  ".join(parts)]
+
+
+## Result window body: the winner, then each player's score this round and running total.
+func _result_details() -> String:
+	var scores := game.scores()
+	var lines: Array[String] = [_result_headline(), ""]
+	for i in player_count:
+		lines.append(I18n.t("result_line") % [_seat_name(i), scores[i], series.totals[i]])
+	return "\n".join(lines)

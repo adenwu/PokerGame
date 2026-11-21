@@ -6,6 +6,7 @@ var failures := 0
 
 
 func _initialize() -> void:
+	GameSettings._player_count = 4  # don't depend on (or overwrite) the saved choice
 	var table: Control = load("res://scenes/big_two/big_two_table.tscn").instantiate()
 	root.add_child(table)
 	await create_timer(1.0).timeout  # let the deal animation finish
@@ -28,13 +29,15 @@ func _initialize() -> void:
 	else:
 		var combo: BigTwoCombo = plays[0]
 		var hand_before: int = table.game.hand_of(0).size()
+		var resting: Dictionary = {}
 		for card in combo.cards:
+			resting[card] = table.hand_views[card].position
 			table._on_card_pressed(card)
 		await create_timer(0.4).timeout
 		var lifted := 0
 		for card in combo.cards:
 			var view: Control = table.hand_views[card]
-			if view.position.y < table.size.y - 200.0:
+			if view.position.distance_to(resting[card]) > table.SELECT_LIFT * 0.8:
 				lifted += 1
 		check(lifted == combo.cards.size(), "picked-up cards moved (animation ran)")
 
@@ -56,20 +59,55 @@ func _initialize() -> void:
 	await create_timer(0.8).timeout
 	check(table.hand_views.size() == table.game.hand_of(0).size(), "new game deals a fresh hand")
 
-	# Finishing a round records it once; the next round keeps totals, a new game clears them.
+	# Finishing a round records it once and opens the result window.
 	table.game.winner = 1
 	table._refresh()
 	table._refresh()
 	check(table.series.history.size() == 1, "finished round recorded exactly once")
-	check(table.next_round_button.visible and not table.play_button.visible, "next round button replaces play")
+	check(not table.play_button.visible, "play button hidden after the round")
+	await create_timer(1.6).timeout
+	check(table.result_panel.visible, "result window opens after the round")
+	check(table.countdown_label.text.contains("4") or table.countdown_label.text.contains("5"), "countdown is running")
+
+	# Continue keeps the totals, closes the window and stops the countdown.
 	var totals_after: Array[int] = table.series.totals.duplicate()
-	table._start_round()
+	table.continue_button.pressed.emit()
 	await create_timer(0.8).timeout
+	check(not table.result_panel.visible, "continue closes the result window")
 	check(table.series.totals == totals_after, "next round keeps the totals")
 	check(table.series.round_number() == 2, "round counter advanced")
-	check(not table.next_round_button.visible or table.game.is_over(), "next round button hidden while playing")
 	table._start_game()
 	check(table.series.history.is_empty(), "new game clears the totals")
+
+	# Without pressing anything, the countdown returns to the start screen.
+	table.game.winner = 2
+	table._refresh()
+	await create_timer(table.RESULT_DELAY + table.COUNTDOWN_SECONDS + 1.0).timeout
+	check(current_scene != null and current_scene.name == "MainMenu", "countdown returns to the start screen")
+	table.queue_free()
+
+	# The start screen: home -> game list -> Big Two options.
+	var menu: Control = current_scene
+	check(menu.home_page.visible and not menu.game_page.visible, "start screen begins at home")
+	menu.home_start_button.pressed.emit()
+	check(menu.game_page.visible and not menu.home_page.visible, "start opens the game list")
+	menu.game_buttons[0].pressed.emit()
+	check(menu.options_page.visible and not menu.game_page.visible, "choosing a game shows the player count")
+	menu.back_button.pressed.emit()
+	check(menu.game_page.visible, "back returns to the game list")
+	menu.back_button.pressed.emit()
+	check(menu.home_page.visible, "back again returns home")
+
+	# A 3-player table seats the computer players right and left.
+	GameSettings._player_count = 3
+	var small: Control = load("res://scenes/big_two/big_two_table.tscn").instantiate()
+	root.add_child(small)
+	await create_timer(1.0).timeout
+	check(small.game.player_count == 3, "3-player game started")
+	check(small.back_views.size() == 3, "two computer fans")
+	check(small._seat_name(2) == I18n.t("seat_3"), "third player sits on the left")
+	check(small.hand_views.size() == small.game.hand_of(0).size(), "your 3-player hand is drawn")
+	check(small.back_views[1].size() == small.game.hand_of(1).size() and small.back_views[2].size() == small.game.hand_of(2).size(), "3-player fans match the hands")
 
 	print("FAILED: %d" % failures if failures > 0 else "ALL PASSED")
 	quit(1 if failures > 0 else 0)

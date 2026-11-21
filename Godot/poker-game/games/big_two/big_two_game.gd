@@ -24,7 +24,8 @@ func start(p_player_count: int, rng: RandomNumberGenerator = null) -> void:
 
 	var deck := Deck.new()
 	deck.shuffle(rng)
-	hands = deck.deal(player_count, 13)
+	# 4 players get 13 cards each; 3 players get 17 each with one card left over.
+	hands = deck.deal(player_count, Deck.SIZE / player_count)
 	current_player = _find_club_three_holder()
 	if current_player < 0:
 		# Only possible with 3 players: the club 3 is the leftover card, so a random seat gets it.

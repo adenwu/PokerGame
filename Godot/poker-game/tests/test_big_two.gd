@@ -165,6 +165,12 @@ func test_simulated_games() -> void:
 		for p in players:
 			total += game.hand_of(p).size()
 		check(total == 52, "all 52 cards dealt (seed %d)" % seed_value)
+		var sizes: Array = []
+		for p in players:
+			sizes.append(game.hand_of(p).size())
+		sizes.sort()
+		var expected_sizes: Array = [17, 17, 18] if players == 3 else [13, 13, 13, 13]
+		check(sizes == expected_sizes, "hand sizes %s with %d players (seed %d)" % [sizes, players, seed_value])
 		if game.won_by_dragon:
 			continue
 
