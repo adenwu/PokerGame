@@ -3,8 +3,7 @@ extends RefCounted
 ## Minimal two-language text lookup (Traditional Chinese / English).
 ## Use I18n.t("key") for plain text, or I18n.t("key") % [args] for templates.
 
-const SETTINGS_PATH := "user://settings.cfg"
-const DEFAULT_LOCALE := "en"
+const DEFAULT_LOCALE := "zh_TW"  # Chinese unless English was chosen with the language button
 
 const TEXTS := {
 	"en": {
@@ -30,6 +29,11 @@ const TEXTS := {
 		"app_title": "Board Games",
 		"choose_game": "Choose a game",
 		"game_big_two": "Big Two",
+		"sfx": "Sound",
+		"music": "Music",
+		"on": "On",
+		"off": "Off",
+		"switch": "%s: %s",
 		"game_dou_di_zhu": "Fight the Landlord",
 		"landlord": "Landlord",
 		"farmer": "Farmer",
@@ -105,6 +109,11 @@ const TEXTS := {
 		"app_title": "棋牌遊戲",
 		"choose_game": "選擇遊戲",
 		"game_big_two": "大老二",
+		"sfx": "音效",
+		"music": "音樂",
+		"on": "開",
+		"off": "關",
+		"switch": "%s：%s",
 		"game_dou_di_zhu": "鬥地主",
 		"landlord": "地主",
 		"farmer": "農民",
@@ -170,10 +179,7 @@ static func t(key: String) -> String:
 
 static func toggle() -> void:
 	locale = "en" if current() == "zh_TW" else "zh_TW"
-	var config := ConfigFile.new()
-	config.load(SETTINGS_PATH)  # keep the other saved settings (e.g. player count)
-	config.set_value("ui", "locale", locale)
-	config.save(SETTINGS_PATH)
+	GameSettings.set_locale(locale)
 
 
 static func current() -> String:
@@ -183,9 +189,5 @@ static func current() -> String:
 
 
 static func _detect_locale() -> String:
-	var config := ConfigFile.new()
-	if config.load(SETTINGS_PATH) == OK:
-		var saved: String = config.get_value("ui", "locale", "")
-		if TEXTS.has(saved):
-			return saved
-	return "zh_TW" if OS.get_locale_language() == "zh" else DEFAULT_LOCALE
+	var saved := GameSettings.locale()
+	return saved if TEXTS.has(saved) else DEFAULT_LOCALE

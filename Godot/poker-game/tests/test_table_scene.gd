@@ -6,7 +6,19 @@ var failures := 0
 
 
 func _initialize() -> void:
-	GameSettings._player_count = 4  # don't depend on (or overwrite) the saved choice
+	GameSettings.save_to_disk = false  # never change the player's saved settings
+	GameSettings.set_player_count(4)
+	await process_frame  # let the Sfx autoload finish building its sounds
+	var sfx: Node = root.get_node("Sfx")
+	for sound in ["click", "select", "deal", "play", "pass", "bid", "bomb", "illegal", "tick", "win", "lose"]:
+		check(sfx.has_sound(sound), "sound '%s' is synthesised" % sound)
+	GameSettings.set_sfx_enabled(false)
+	sfx.play("click")
+	var any_playing := false
+	for player in sfx._players:
+		any_playing = any_playing or player.playing
+	check(not any_playing, "no sound while sound is switched off")
+	GameSettings.set_sfx_enabled(true)
 	var table: Control = load("res://scenes/big_two/big_two_table.tscn").instantiate()
 	root.add_child(table)
 	await create_timer(1.0).timeout  # let the deal animation finish
@@ -97,9 +109,18 @@ func _initialize() -> void:
 	check(menu.game_page.visible, "back returns to the game list")
 	menu.back_button.pressed.emit()
 	check(menu.home_page.visible, "back again returns home")
+	var sound_was: bool = GameSettings.sfx_enabled()
+	menu.sfx_button.pressed.emit()
+	check(GameSettings.sfx_enabled() != sound_was, "sound switch toggles")
+	check(menu.sfx_button.text.contains(I18n.t("off" if sound_was else "on")), "sound switch shows its state")
+	menu.sfx_button.pressed.emit()
+	var music_was: bool = GameSettings.music_enabled()
+	menu.music_button.pressed.emit()
+	check(GameSettings.music_enabled() != music_was, "music switch toggles")
+	menu.music_button.pressed.emit()
 
 	# A 3-player table seats the computer players right and left.
-	GameSettings._player_count = 3
+	GameSettings.set_player_count(3)
 	var small: Control = load("res://scenes/big_two/big_two_table.tscn").instantiate()
 	root.add_child(small)
 	await create_timer(1.0).timeout

@@ -5,6 +5,7 @@ var failures := 0
 
 
 func _init() -> void:
+	GameSettings.save_to_disk = false  # never change the player's saved settings
 	test_card_order()
 	test_combos()
 	test_straight_order()
@@ -121,6 +122,11 @@ func test_rules() -> void:
 
 
 func test_translations() -> void:
+	var saved_locale := I18n.locale
+	GameSettings._values["ui/locale"] = ""  # as if nothing was ever saved
+	I18n.locale = ""
+	check(I18n.current() == "zh_TW", "Chinese is the default language")
+	I18n.locale = saved_locale
 	var english: Dictionary = I18n.TEXTS["en"]
 	var chinese: Dictionary = I18n.TEXTS["zh_TW"]
 	for key in english:

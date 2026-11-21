@@ -99,6 +99,15 @@ func _refresh_extra() -> void:
 		info_label.text = I18n.t("stake_info") % [game.highest_bid, game.multiplier()]
 
 
+func _play_sound(combo) -> String:
+	return "bomb" if DouDiZhuCombo.is_bomb_type(combo.type) else "play"
+
+
+## Farmers win or lose together.
+func _human_won() -> bool:
+	return game.landlord_won() == (game.landlord == HUMAN)
+
+
 func _result_headline() -> String:
 	var headline := ""
 	if game.landlord_won():
@@ -121,12 +130,14 @@ func _on_bid_pressed(points: int) -> void:
 
 
 func _after_bid(player: int, points: int) -> void:
+	Sfx.play("pass" if points == 0 else "bid")
 	_set_action("act_no_bid" if points == 0 else "act_bid", [_seat_name(player)] if points == 0 else [_seat_name(player), points])
 	if game.needs_redeal:
 		redealt = true
 		_start_round()
 	elif not game.is_bidding():
 		_set_action("act_landlord", [_seat_name(game.landlord)])
+		Sfx.play_series("deal", 3, 0.08)
 		_reveal_bottom()
 
 

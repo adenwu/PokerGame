@@ -7,6 +7,7 @@ var failures := 0
 
 
 func _initialize() -> void:
+	GameSettings.save_to_disk = false  # never change the player's saved settings
 	var table: Control = load("res://scenes/dou_di_zhu/dou_di_zhu_table.tscn").instantiate()
 	root.add_child(table)
 	await create_timer(0.8).timeout

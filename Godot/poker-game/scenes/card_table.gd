@@ -112,9 +112,11 @@ func _ai_step(player: int) -> void:
 	var cards := _ai_choose_play(player)
 	if cards.is_empty():
 		game.pass_turn(player)
+		Sfx.play("pass")
 		_set_action("act_passed", [_seat_name(player)])
 	else:
 		game.play(player, cards)
+		Sfx.play(_play_sound(game.last_combo))
 		_ai_play_animation(player, game.last_combo.cards)
 		_set_action("act_played", [_seat_name(player)])
 
@@ -139,6 +141,16 @@ func _turn_hint(my_turn: bool) -> String:
 ## Called after every refresh so a table can update its own widgets.
 func _refresh_extra() -> void:
 	pass
+
+
+## Sound for a play that just landed on the table.
+func _play_sound(_combo) -> String:
+	return "play"
+
+
+## True when the round's winner is you (or, in team games, your side).
+func _human_won() -> bool:
+	return game.winner == HUMAN
 
 
 func _result_headline() -> String:
@@ -412,6 +424,7 @@ func _clear_all_cards() -> void:
 
 ## Creates every hand at the middle of the table, then fans it out to each seat.
 func _deal_animation() -> void:
+	Sfx.play_series("deal", 10, 0.05, -3.0)
 	for seat in player_count:
 		_add_to_hand(seat, game.hand_of(seat), _table_center(), DEAL_STAGGER)
 
@@ -448,10 +461,12 @@ func _on_card_pressed(card: Card) -> void:
 
 func _on_play_pressed() -> void:
 	if not game.play(HUMAN, selected):
+		Sfx.play("illegal")
 		_set_action("act_illegal")
 		_refresh_controls()
 		return
 
+	Sfx.play(_play_sound(game.last_combo))
 	# game.last_combo.cards is in display order, so the cards land on the table in order.
 	var views: Array = []
 	for card in game.last_combo.cards:
@@ -470,6 +485,7 @@ func _on_play_pressed() -> void:
 
 func _on_pass_pressed() -> void:
 	if game.pass_turn(HUMAN):
+		Sfx.play("pass")
 		# Picked-up cards drop back into the fan.
 		selected.clear()
 		_layout_hand(MOVE_TIME)
@@ -603,9 +619,12 @@ func _show_result_after_delay() -> void:
 	result_title.text = I18n.t("round_over") % (series.round_number() - 1)
 	result_body.text = _result_details()
 	result_panel.visible = true
+	Sfx.play("win" if _human_won() else "lose")
 	status_label.visible = false  # the window shows the same result; avoid text peeking out around it
 	for left in range(COUNTDOWN_SECONDS, 0, -1):
 		countdown_label.text = I18n.t("countdown") % left
+		if left < COUNTDOWN_SECONDS:
+			Sfx.play("tick", -4.0)
 		_layout_result_panel()
 		await get_tree().create_timer(1.0).timeout
 		if my_run != run_id:

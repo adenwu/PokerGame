@@ -7,6 +7,7 @@ var failures := 0
 
 
 func _init() -> void:
+	GameSettings.save_to_disk = false  # never change the player's saved settings
 	test_deck()
 	test_combo_types()
 	test_invalid_combos()

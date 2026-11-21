@@ -21,6 +21,8 @@ var chosen_game := 0  # index into GAMES
 var title_label: Label
 var home_page: Control
 var home_start_button: Button
+var sfx_button: Button
+var music_button: Button
 var game_page: VBoxContainer
 var game_buttons: Array[Button] = []
 var options_page: VBoxContainer
@@ -58,7 +60,19 @@ func _build_ui() -> void:
 	# Step 1: home.
 	home_start_button = _big_button()
 	home_start_button.pressed.connect(_show_page.bind(Page.GAMES))
-	home_page = _centered(home_start_button)
+	var home := VBoxContainer.new()
+	home.add_theme_constant_override("separation", 24)
+	home.add_child(_centered(home_start_button))
+	# Sound and music switches (music is only remembered for now: none is added yet).
+	var audio_row := HBoxContainer.new()
+	audio_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	audio_row.add_theme_constant_override("separation", 16)
+	sfx_button = _switch_button(_on_sfx_pressed)
+	music_button = _switch_button(_on_music_pressed)
+	audio_row.add_child(sfx_button)
+	audio_row.add_child(music_button)
+	home.add_child(audio_row)
+	home_page = home
 	column.add_child(home_page)
 
 	# Step 2: the list of games.
@@ -112,6 +126,15 @@ func _build_ui() -> void:
 	add_child(language_button)
 
 
+func _switch_button(handler: Callable) -> Button:
+	var button := Button.new()
+	button.custom_minimum_size = Vector2(150, 44)
+	button.add_theme_font_size_override("font_size", 20)
+	button.toggle_mode = true
+	button.pressed.connect(handler)
+	return button
+
+
 func _big_button() -> Button:
 	var button := Button.new()
 	button.custom_minimum_size = Vector2(260, 64)
@@ -142,6 +165,8 @@ func _refresh() -> void:
 		Page.HOME:
 			title_label.text = I18n.t("app_title")
 			home_start_button.text = I18n.t("start")
+			_show_switch(sfx_button, "sfx", GameSettings.sfx_enabled())
+			_show_switch(music_button, "music", GameSettings.music_enabled())
 		Page.GAMES:
 			title_label.text = I18n.t("choose_game")
 			for i in GAMES.size():
@@ -161,6 +186,23 @@ func _refresh() -> void:
 				button.add_theme_color_override("font_color", SELECTED_COLOR if count == chosen else Color.WHITE)
 				button.add_theme_color_override("font_pressed_color", SELECTED_COLOR)
 				button.add_theme_color_override("font_disabled_color", SELECTED_COLOR)
+
+
+func _show_switch(button: Button, key: String, on: bool) -> void:
+	button.text = I18n.t("switch") % [I18n.t(key), I18n.t("on" if on else "off")]
+	button.button_pressed = on
+	for prop in ["font_color", "font_pressed_color", "font_hover_color", "font_hover_pressed_color"]:
+		button.add_theme_color_override(prop, SELECTED_COLOR if on else Color(1, 1, 1, 0.6))
+
+
+func _on_sfx_pressed() -> void:
+	GameSettings.set_sfx_enabled(not GameSettings.sfx_enabled())
+	_refresh()  # the automatic button click then plays only if sound is now on
+
+
+func _on_music_pressed() -> void:
+	GameSettings.set_music_enabled(not GameSettings.music_enabled())
+	_refresh()
 
 
 func _on_game_pressed(index: int) -> void:
