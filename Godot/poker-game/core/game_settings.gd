@@ -6,7 +6,8 @@ extends RefCounted
 const SETTINGS_PATH := "user://settings.cfg"
 const DEFAULT_PLAYER_COUNT := 4
 
-## Tests set this to false so they never change the player's saved settings.
+## Tests set this to false so they neither read nor change the player's saved
+## settings: every value starts at its default and lives in memory only.
 static var save_to_disk := true
 
 static var _values := {}  # "section/key" -> value, cached after first read
@@ -69,7 +70,7 @@ static func _read(section: String, key: String, default_value: Variant) -> Varia
 	var id := section + "/" + key
 	if not _values.has(id):
 		var config := ConfigFile.new()
-		var loaded := config.load(SETTINGS_PATH) == OK
+		var loaded := save_to_disk and config.load(SETTINGS_PATH) == OK
 		_values[id] = config.get_value(section, key, default_value) if loaded else default_value
 	return _values[id]
 

@@ -23,6 +23,7 @@ class Tile:
 	var y := 0.0
 	var z := 0  # layer; higher covers lower
 	var in_pile := false  # one of the side piles
+	var loose := false  # popped back out of the tray into its own row
 	var state := State.BOARD
 	var above: Array = []  # tiles in higher layers that overlap this one
 
@@ -33,6 +34,9 @@ var tiles: Array[Tile] = []
 var tray: Array[Tile] = []
 var undo_left := 1
 var shuffle_left := 1
+var pop_left := 1
+## Where popped-out tiles go: a free row just below the board (tile units).
+var return_row := Vector2.ZERO  # x of the first spot, y of the row
 var cover_shade := 0.5  # how dark covered tiles are drawn (UI hint; closer to 1 is harder)
 var solution: Array[int] = []  # tile ids in an order that clears the level (from the deal)
 var _history: Array = []  # snapshots for undo
@@ -71,6 +75,8 @@ func start(p_level: int, available_kinds: int, rng: RandomNumberGenerator = null
 	cover_shade = p["cover_shade"]
 	undo_left = 1
 	shuffle_left = 1
+	pop_left = 1
+	return_row = Vector2(p["cols"] * 0.5 - 1.6, p["rows"] + 0.05)  # just clear of the lowest row
 	tray.clear()
 	_history.clear()
 	tiles.clear()
@@ -266,6 +272,41 @@ func shuffle(rng: RandomNumberGenerator = null) -> bool:
 	shuffle_left -= 1
 	_history.clear()  # undo can't reach back past a shuffle
 	return true
+
+
+func can_pop_out() -> bool:
+	return pop_left > 0 and not tray.is_empty() and not is_won()
+
+
+## Takes up to three random tiles out of the tray and puts them back on the
+## board, uncovered, in a row of their own below the stacks.
+func pop_out(rng: RandomNumberGenerator = null) -> Array[Tile]:
+	var popped: Array[Tile] = []
+	if not can_pop_out():
+		return popped
+	if rng == null:
+		rng = RandomNumberGenerator.new()
+		rng.randomize()
+	var choices := tray.duplicate()
+	_shuffle_array(choices, rng)
+	popped.assign(choices.slice(0, MATCH))
+	var top_z := 0
+	for t in tiles:
+		top_z = maxi(top_z, t.z)
+	for i in popped.size():
+		var t := popped[i]
+		tray.erase(t)
+		t.state = State.BOARD
+		t.loose = true
+		t.x = return_row.x + i * 1.1
+		t.y = return_row.y
+		t.z = top_z + 1
+		t.above.clear()
+		for other in tiles:
+			other.above.erase(t)  # it no longer lies on top of anything
+	pop_left -= 1
+	_history.clear()  # undo can't reach back past a pop-out
+	return popped
 
 
 func _snapshot() -> Dictionary:

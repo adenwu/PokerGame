@@ -40,11 +40,25 @@ func _initialize() -> void:
 	check(game.tray.is_empty() and first.state == TileStackGame.State.BOARD, "undo puts it back")
 	check(table.undo_button.disabled, "undo used up")
 
+	# Pop out: a picked tile comes back to the board.
+	check(table.pop_button.disabled, "pop-out unavailable with an empty tray")
+	var second: TileStackGame.Tile = game.tiles[game.solution[0]]
+	table._on_tile_picked(second)
+	await create_timer(0.6).timeout
+	check(not table.pop_button.disabled, "pop-out available with tiles in the tray")
+	table.pop_button.pressed.emit()
+	await create_timer(0.4).timeout
+	check(game.tray.is_empty() and second.state == TileStackGame.State.BOARD, "pop-out returns the tile to the board")
+	check(table.board_layer.get_children().has(table.views[second.id]), "its view is back on the board")
+	check(table.pop_button.disabled, "pop-out used up")
+	check(table.undo_button.text.contains("0") or table.undo_button.disabled, "tool tiles show uses left")
+
 	check(not table.finish_button.visible, "no finish button while tiles are stacked")
-	for id in game.solution:
-		if game.can_auto_finish():
+	while not game.can_auto_finish() and not game.is_over():
+		var next := game._greedy_pick()
+		if next == null:
 			break
-		table._on_tile_picked(game.tiles[id])
+		table._on_tile_picked(next)
 		var waited := 0.0
 		while table.busy and waited < 2.0:
 			await create_timer(0.05).timeout
@@ -88,7 +102,7 @@ func _initialize() -> void:
 	check(menu.level_prev.disabled, "no level before 1")
 	menu.level_next.pressed.emit()
 	menu.level_next.pressed.emit()
-	check(GameSettings.tile_level() == 2, "can't go past the highest unlocked level")
+	check(GameSettings.tile_level() == 2, "can't go past the highest unlocked level (level %d, unlocked %d)" % [GameSettings.tile_level(), GameSettings.tile_level_unlocked()])
 
 	print("FAILED: %d" % failures if failures > 0 else "ALL PASSED")
 	quit(1 if failures > 0 else 0)

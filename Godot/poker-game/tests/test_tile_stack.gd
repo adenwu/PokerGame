@@ -17,6 +17,7 @@ func _init() -> void:
 	test_losing()
 	test_undo_and_shuffle()
 	test_auto_finish()
+	test_pop_out()
 	test_tile_faces()
 	print("FAILED: %d" % failures if failures > 0 else "ALL PASSED")
 	quit(1 if failures > 0 else 0)
@@ -207,6 +208,38 @@ func test_auto_finish() -> void:
 		g.resolve()
 		steps += 1
 	check(g.can_auto_finish() and steps < g.solution.size(), "level 6 offers finishing before the last tile (after %d of %d)" % [steps, g.solution.size()])
+
+
+func test_pop_out() -> void:
+	var g := TileStackGame.new()
+	g.start(5, KINDS)
+	check(not g.can_pop_out(), "nothing to pop out with an empty tray")
+	for i in 4:
+		g.pick(g.tiles[g.solution[i]])
+		g.resolve()
+	var in_tray := g.tray.size()
+	var board_before := g.board_count()
+	var popped := g.pop_out()
+	check(popped.size() == mini(3, in_tray), "pops out up to three tiles (%d)" % popped.size())
+	check(g.tray.size() == in_tray - popped.size(), "popped tiles leave the tray")
+	check(g.board_count() == board_before + popped.size(), "popped tiles are back on the board")
+	for t in popped:
+		check(g.is_free(t), "popped tile can be picked again")
+		check(is_equal_approx(t.y, g.return_row.y), "popped tile sits in the pop-out row")
+		for other in g.tiles:
+			if other != t and other.state == TileStackGame.State.BOARD:
+				check(not other.above.has(t), "popped tile no longer covers anything")
+	check(not g.can_pop_out(), "pop-out works once per level")
+	# The level can still be finished afterwards.
+	var guard := 0
+	while not g.is_over() and guard < 400:
+		var next := g._greedy_pick()
+		if next == null:
+			break
+		g.pick(next)
+		g.resolve()
+		guard += 1
+	check(g.is_over(), "game continues normally after a pop-out")
 
 
 func test_tile_faces() -> void:

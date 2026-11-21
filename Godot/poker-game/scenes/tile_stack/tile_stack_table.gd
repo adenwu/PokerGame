@@ -23,6 +23,9 @@ var tiles_label: Label
 var undo_button: Button
 var finish_button: Button
 var shuffle_button: Button
+var pop_button: Button
+var tool_row: HBoxContainer
+var bounds := Rect2()  # board extent in tile units, fixed for the level (incl. the pop-out row)
 var menu_button: Button
 var language_button: Button
 var board_layer: Control
@@ -52,14 +55,12 @@ func _build_ui() -> void:
 	var top_row := HBoxContainer.new()
 	top_row.add_theme_constant_override("separation", 12)
 	top_row.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	top_row.position = Vector2(-680, 16)
-	top_row.size = Vector2(660, 40)
+	top_row.position = Vector2(-420, 16)
+	top_row.size = Vector2(400, 40)
 	top_row.alignment = BoxContainer.ALIGNMENT_END
 	add_child(top_row)
 	finish_button = _button(top_row, _on_finish_pressed)
 	finish_button.add_theme_color_override("font_color", ResultWindow.ACCENT)
-	undo_button = _button(top_row, _on_undo_pressed)
-	shuffle_button = _button(top_row, _on_shuffle_pressed)
 	menu_button = _button(top_row, _go_to_menu)
 	language_button = _button(top_row, _on_language_pressed)
 
@@ -76,6 +77,14 @@ func _build_ui() -> void:
 	tray_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(tray_panel)
 
+	# The three tool tiles, beside the tray.
+	tool_row = HBoxContainer.new()
+	tool_row.add_theme_constant_override("separation", 10)
+	add_child(tool_row)
+	undo_button = _tool_button(_on_undo_pressed)
+	pop_button = _tool_button(_on_pop_pressed)
+	shuffle_button = _tool_button(_on_shuffle_pressed)
+
 	tray_layer = Control.new()
 	tray_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(tray_layer)
@@ -84,6 +93,30 @@ func _build_ui() -> void:
 	result_panel.menu_button.pressed.connect(_go_to_menu)
 	result_panel.continue_button.pressed.connect(_on_continue_pressed)
 	add_child(result_panel)
+
+
+## A tool drawn like a mahjong tile: icon on top, name and uses left below.
+func _tool_button(handler: Callable) -> Button:
+	var button := Button.new()
+	button.custom_minimum_size = Vector2(84, _slot_size().y)
+	button.add_theme_font_size_override("font_size", 18)
+	button.focus_mode = Control.FOCUS_NONE
+	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+		var style := StyleBoxFlat.new()
+		style.bg_color = TileView.FACE_COLOR if state != "disabled" else Color(0.6, 0.58, 0.52)
+		if state == "hover":
+			style.bg_color = Color(1.0, 0.97, 0.82)
+		style.border_color = TileView.EDGE_COLOR
+		style.border_width_bottom = int(TileView.DEPTH.y)
+		style.border_width_right = int(TileView.DEPTH.x)
+		style.set_corner_radius_all(8)
+		button.add_theme_stylebox_override(state, style)
+	for prop in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		button.add_theme_color_override(prop, Color(0.15, 0.15, 0.15))
+	button.add_theme_color_override("font_disabled_color", Color(0.35, 0.35, 0.35))
+	button.pressed.connect(handler)
+	tool_row.add_child(button)
+	return button
 
 
 func _label(font_size: int) -> Label:
@@ -123,21 +156,14 @@ func _slot_position(index: int) -> Vector2:
 
 ## Top-left pixel of a tile on the board, with the whole layout centred in the free area.
 func _board_position(tile) -> Vector2:
-	var min_x := INF
-	var max_x := -INF
-	var min_y := INF
-	var max_y := -INF
-	for t in game.tiles:
-		min_x = minf(min_x, t.x)
-		max_x = maxf(max_x, t.x)
-		min_y = minf(min_y, t.y)
-		max_y = maxf(max_y, t.y)
+	var min_x := bounds.position.x
+	var min_y := bounds.position.y
 	var face := TileView.FACE
-	var board_size := Vector2((max_x - min_x + 1.0) * face.x, (max_y - min_y + 1.0) * face.y)
-	var area_top := 84.0
-	var area_bottom := _tray_rect().position.y - 16.0
+	var board_size := (bounds.size + Vector2.ONE) * face
+	var area_top := 72.0
+	var area_bottom := _tray_rect().position.y - 10.0
 	var origin := Vector2((size.x - board_size.x) * 0.5, area_top + (area_bottom - area_top - board_size.y) * 0.5)
-	var lift: float = 0.0 if tile.in_pile else tile.z * LAYER_LIFT
+	var lift: float = 0.0 if tile.in_pile or tile.loose else tile.z * LAYER_LIFT
 	return origin + Vector2((tile.x - min_x) * face.x, (tile.y - min_y) * face.y - lift)
 
 
@@ -149,6 +175,8 @@ func _layout(duration: float) -> void:
 	var rect := _tray_rect()
 	tray_panel.position = rect.position
 	tray_panel.size = rect.size
+	tool_row.reset_size()
+	tool_row.position = Vector2(rect.end.x + 16.0, rect.position.y + TRAY_PADDING)
 	result_panel.center_in(size)
 	for t in game.tiles:
 		var view: TileView = views[t.id]
@@ -181,6 +209,13 @@ func _start_level(level: int) -> void:
 	result_panel.visible = false
 	GameSettings.set_tile_level(level)
 	game.start(level, TileFaces.kind_count())
+	# The board's extent stays put for the whole level, including the row where
+	# popped-out tiles land, so nothing jumps when tiles come and go.
+	bounds = Rect2(game.tiles[0].x, game.tiles[0].y, 0, 0)
+	for t in game.tiles:
+		bounds = bounds.expand(Vector2(t.x, t.y))
+	bounds = bounds.expand(game.return_row + Vector2(2.2, 0.0))
+	bounds = bounds.expand(game.return_row)
 
 	for child in board_layer.get_children():
 		child.queue_free()
@@ -282,6 +317,20 @@ func _on_finish_pressed() -> void:
 		_show_result()
 
 
+func _on_pop_pressed() -> void:
+	if busy:
+		return
+	var popped := game.pop_out()
+	if popped.is_empty():
+		return
+	Sfx.play_series("select", popped.size(), 0.06)
+	for t in popped:
+		var view: TileView = views[t.id]
+		view.reparent(board_layer)  # added last, so drawn on top
+	_layout(FLY_TIME)
+	_refresh()
+
+
 func _on_undo_pressed() -> void:
 	if busy or not game.undo():
 		return
@@ -367,8 +416,10 @@ func _show_result() -> void:
 func _refresh() -> void:
 	level_label.text = I18n.t("level_n") % game.level
 	tiles_label.text = I18n.t("tiles_left") % (game.board_count() + game.tray.size())
-	undo_button.text = I18n.t("undo") % game.undo_left
-	shuffle_button.text = I18n.t("shuffle") % game.shuffle_left
+	undo_button.text = I18n.t("tool_undo") % game.undo_left
+	pop_button.text = I18n.t("tool_pop") % game.pop_left
+	shuffle_button.text = I18n.t("tool_refresh") % game.shuffle_left
+	pop_button.disabled = busy or not game.can_pop_out()
 	menu_button.text = I18n.t("menu")
 	language_button.text = I18n.t("language_button")
 	undo_button.disabled = busy or not game.can_undo()
