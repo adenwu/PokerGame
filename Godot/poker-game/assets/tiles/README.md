@@ -7,4 +7,5 @@ so name them `01_xxx.png`, `02_xxx.png`, ... to control which appear first
 
 - Square-ish images with a transparent background look best; they are scaled
   to fit the tile face (about 40 × 52 pixels).
-- Only use images you have the right to use.
+- Only use images you have the right to use. See CREDITS.md for where the
+  current pictures come from.

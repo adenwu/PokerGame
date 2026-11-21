@@ -16,6 +16,8 @@ func _init() -> void:
 	test_tray()
 	test_losing()
 	test_undo_and_shuffle()
+	test_auto_finish()
+	test_tile_faces()
 	print("FAILED: %d" % failures if failures > 0 else "ALL PASSED")
 	quit(1 if failures > 0 else 0)
 
@@ -144,6 +146,75 @@ func test_undo_and_shuffle() -> void:
 			after[t.kind] = after.get(t.kind, 0) + 1
 	check(before == after, "shuffle keeps how many of each kind")
 	check(not g.shuffle(), "only one shuffle per level")
+
+
+func _link(g: TileStackGame) -> void:
+	for t in g.tiles:
+		t.above.clear()
+		for o in g.tiles:
+			if o.z > t.z and TileStackGame.covers(o, t):
+				t.above.append(o)
+
+
+func test_auto_finish() -> void:
+	# Flat board (nothing stacked): can finish.
+	var flat := TileStackGame.new()
+	flat.tiles.clear()
+	for i in 6:
+		_tile(flat, i, float(i), 0.0, 0, [0, 1, 0, 1, 1, 0][i])
+	_link(flat)
+	var plan := flat.auto_finish_plan()
+	check(not plan.is_empty(), "flat board can be finished")
+	check(flat.board_count() == 6 and flat.tray.is_empty(), "planning doesn't change the board")
+	for id in plan:
+		flat.pick(flat.tiles[id])
+		flat.resolve()
+	check(flat.is_won(), "the plan clears the level")
+
+	# Still stacked with two kinds: not yet.
+	var stacked := TileStackGame.new()
+	stacked.tiles.clear()
+	for i in 6:
+		_tile(stacked, i, 0.0 if i < 2 else float(i), 0.0, 1 if i == 1 else 0, [0, 1, 0, 1, 1, 0][i])
+	_link(stacked)
+	check(not stacked.can_auto_finish(), "stacked tiles of several kinds can't be skipped")
+
+	# One kind left, even stacked: can finish.
+	var single := TileStackGame.new()
+	single.tiles.clear()
+	for i in 6:
+		_tile(single, i, 0.0, 0.0, i, 2)
+	_link(single)
+	check(single.can_auto_finish(), "only one kind left can be finished")
+
+	# A clogged tray can't be rescued.
+	var clogged := TileStackGame.new()
+	clogged.tiles.clear()
+	for i in 18:
+		_tile(clogged, i, float(i), 0.0, 0, i % 6)
+	_link(clogged)
+	for i in 6:
+		clogged.pick(clogged.tiles[i])
+		clogged.resolve()
+	check(clogged.tray.size() == 6 and not clogged.can_auto_finish(), "no finish button when it would fail")
+
+	# A real level, played until it is flat, can be finished.
+	var g := TileStackGame.new()
+	g.start(6, KINDS)
+	var steps := 0
+	while not g.can_auto_finish() and steps < g.solution.size():
+		g.pick(g.tiles[g.solution[steps]])
+		g.resolve()
+		steps += 1
+	check(g.can_auto_finish() and steps < g.solution.size(), "level 6 offers finishing before the last tile (after %d of %d)" % [steps, g.solution.size()])
+
+
+func test_tile_faces() -> void:
+	check(TileFaces.images().size() >= 4, "party emblem pictures are loaded (%d)" % TileFaces.images().size())
+	check(TileFaces.kind_count() >= 12, "enough tile kinds for the hardest levels")
+	var heart: Color = TileFaces.SUITS[1][1]
+	var diamond: Color = TileFaces.SUITS[2][1]
+	check(absf(heart.h - diamond.h) > 0.3 or heart.s < 0.3 or diamond.s < 0.3, "hearts and diamonds have clearly different colours")
 
 
 func _tile(g: TileStackGame, id: int, x: float, y: float, z: int, kind: int) -> TileStackGame.Tile:

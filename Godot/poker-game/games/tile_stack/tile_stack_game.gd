@@ -164,6 +164,70 @@ func is_over() -> bool:
 	return is_won() or is_lost()
 
 
+# --- Finishing in one go -------------------------------------------------------
+
+## When nothing is stacked any more (every tile left is uncovered) or only one
+## kind of tile is left, the rest is just busywork: this returns the tile ids to
+## pick, in order, to clear the level. Empty when that isn't the case, or when the
+## level can no longer be won (e.g. the tray is already clogged).
+func auto_finish_plan() -> Array[int]:
+	var plan: Array[int] = []
+	if is_over() or board_count() == 0:
+		return plan
+	var kinds := {}
+	var all_free := true
+	for t in tiles:
+		if t.state == State.BOARD:
+			kinds[t.kind] = true
+			all_free = all_free and is_free(t)
+	for t in tray:
+		kinds[t.kind] = true
+	if not all_free and kinds.size() > 1:
+		return plan
+
+	# Play it out greedily on the real state, then put everything back.
+	var snap := _snapshot()
+	var history := _history.duplicate()
+	while not is_over():
+		var next := _greedy_pick()
+		if next == null:
+			break
+		plan.append(next.id)
+		pick(next)
+		resolve()
+	var won := is_won()
+	_restore(snap)
+	_history = history
+	if not won:
+		plan.clear()
+	return plan
+
+
+func can_auto_finish() -> bool:
+	return not auto_finish_plan().is_empty()
+
+
+## A free tile of the kind the tray holds most of (or that is most common on the board).
+func _greedy_pick() -> Tile:
+	var in_tray := {}
+	for t in tray:
+		in_tray[t.kind] = in_tray.get(t.kind, 0) + 1
+	var free_count := {}
+	for t in tiles:
+		if is_free(t):
+			free_count[t.kind] = free_count.get(t.kind, 0) + 1
+	var best: Tile = null
+	var best_score := -1
+	for t in tiles:
+		if not is_free(t):
+			continue
+		var score: int = in_tray.get(t.kind, 0) * 100 + free_count[t.kind]
+		if score > best_score:
+			best = t
+			best_score = score
+	return best
+
+
 # --- Helpers (once per level each) ---------------------------------------------
 
 func can_undo() -> bool:

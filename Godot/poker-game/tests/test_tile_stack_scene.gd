@@ -40,13 +40,22 @@ func _initialize() -> void:
 	check(game.tray.is_empty() and first.state == TileStackGame.State.BOARD, "undo puts it back")
 	check(table.undo_button.disabled, "undo used up")
 
+	check(not table.finish_button.visible, "no finish button while tiles are stacked")
 	for id in game.solution:
+		if game.can_auto_finish():
+			break
 		table._on_tile_picked(game.tiles[id])
 		var waited := 0.0
 		while table.busy and waited < 2.0:
 			await create_timer(0.05).timeout
 			waited += 0.05
-	check(game.is_won(), "level 1 cleared by clicking")
+	check(table.finish_button.visible, "finish button appears once the board is flat")
+	table.finish_button.pressed.emit()
+	var finish_wait := 0.0
+	while table.busy and finish_wait < 6.0:
+		await create_timer(0.1).timeout
+		finish_wait += 0.1
+	check(game.is_won(), "level 1 cleared (finished in one go)")
 	await create_timer(1.2).timeout
 	check(table.result_panel.visible, "win window opens")
 	check(GameSettings.tile_level_unlocked() >= 2, "level 2 unlocked")

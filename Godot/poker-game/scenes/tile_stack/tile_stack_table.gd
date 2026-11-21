@@ -8,6 +8,7 @@ const RESULT_DELAY := 0.8
 
 const FLY_TIME := 0.22
 const CLEAR_TIME := 0.2
+const AUTO_STEP := 0.09  # time per tile when finishing automatically
 const SLOT_GAP := 8.0
 const TRAY_PADDING := 12.0
 const LAYER_LIFT := 4.0  # each layer is drawn a little higher, so stacked tiles show their edges
@@ -20,6 +21,7 @@ var run_id := 0  # bumped on every new level so a stale countdown stops
 var level_label: Label
 var tiles_label: Label
 var undo_button: Button
+var finish_button: Button
 var shuffle_button: Button
 var menu_button: Button
 var language_button: Button
@@ -50,10 +52,12 @@ func _build_ui() -> void:
 	var top_row := HBoxContainer.new()
 	top_row.add_theme_constant_override("separation", 12)
 	top_row.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	top_row.position = Vector2(-560, 16)
-	top_row.size = Vector2(540, 40)
+	top_row.position = Vector2(-680, 16)
+	top_row.size = Vector2(660, 40)
 	top_row.alignment = BoxContainer.ALIGNMENT_END
 	add_child(top_row)
+	finish_button = _button(top_row, _on_finish_pressed)
+	finish_button.add_theme_color_override("font_color", ResultWindow.ACCENT)
 	undo_button = _button(top_row, _on_undo_pressed)
 	shuffle_button = _button(top_row, _on_shuffle_pressed)
 	menu_button = _button(top_row, _go_to_menu)
@@ -244,6 +248,40 @@ func _on_tile_picked(tile) -> void:
 		_show_result()
 
 
+## Picks the remaining tiles quickly, one after another, to finish the level.
+func _on_finish_pressed() -> void:
+	var plan := game.auto_finish_plan()
+	if busy or plan.is_empty():
+		return
+	busy = true
+	_refresh()
+	var my_run := run_id
+	for id in plan:
+		var tile = game.tiles[id]
+		game.pick(tile)
+		var view: TileView = views[id]
+		view.reparent(tray_layer)
+		view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		Sfx.play("select", -6.0, 1.1)
+		_layout(AUTO_STEP)
+		await get_tree().create_timer(AUTO_STEP).timeout
+		if my_run != run_id:
+			return
+		var removed := game.resolve()
+		if not removed.is_empty():
+			Sfx.play("match")
+			for t in removed:
+				var gone: TileView = views[t.id]
+				var tween := create_tween().set_parallel(true)
+				tween.tween_property(gone, "scale", Vector2.ZERO, CLEAR_TIME)
+				tween.tween_property(gone, "modulate:a", 0.0, CLEAR_TIME)
+			_layout(AUTO_STEP)
+	busy = false
+	_refresh()
+	if game.is_over():
+		_show_result()
+
+
 func _on_undo_pressed() -> void:
 	if busy or not game.undo():
 		return
@@ -334,6 +372,8 @@ func _refresh() -> void:
 	menu_button.text = I18n.t("menu")
 	language_button.text = I18n.t("language_button")
 	undo_button.disabled = busy or not game.can_undo()
+	finish_button.text = I18n.t("auto_finish")
+	finish_button.visible = not busy and game.can_auto_finish()
 	shuffle_button.disabled = busy or not game.can_shuffle()
 	_refresh_board()
 

@@ -9,10 +9,11 @@ extends RefCounted
 const IMAGE_DIR := "res://assets/tiles/"
 const IMAGE_EXTENSIONS := ["png", "jpg", "jpeg", "webp", "svg"]
 
-const SUITS := [["♠", Color(0.1, 0.1, 0.12)], ["♥", Color(0.82, 0.1, 0.12)], ["♦", Color(0.85, 0.28, 0.05)], ["♣", Color(0.05, 0.4, 0.2)]]
+# Four-colour suits so hearts and diamonds can't be mixed up: black, red, blue, green.
+const SUITS := [["♠", Color(0.1, 0.1, 0.12)], ["♥", Color(0.85, 0.1, 0.15)], ["♦", Color(0.1, 0.35, 0.85)], ["♣", Color(0.05, 0.45, 0.2)]]
 const SHAPES := [
 	["star", Color(0.9, 0.65, 0.05)],
-	["circle", Color(0.15, 0.4, 0.85)],
+	["circle", Color(0.35, 0.35, 0.4)],
 	["triangle", Color(0.2, 0.6, 0.25)],
 	["square", Color(0.55, 0.25, 0.7)],
 	["hexagon", Color(0.95, 0.45, 0.1)],
