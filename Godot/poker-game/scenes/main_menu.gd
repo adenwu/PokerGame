@@ -8,9 +8,11 @@ enum Page { HOME, GAMES, OPTIONS }
 
 const SELECTED_COLOR := Color(1.0, 0.9, 0.3)
 
-# Games on the game list: title key and the table scene it opens.
+# Games on the game list: title key, the table scene it opens, and either a
+# choice of player counts (saved in GameSettings) or a fixed count.
 const GAMES := [
-	{"title": "game_big_two", "scene": "res://scenes/big_two/big_two_table.tscn"},
+	{"title": "game_big_two", "scene": "res://scenes/big_two/big_two_table.tscn", "players": [3, 4]},
+	{"title": "game_dou_di_zhu", "scene": "res://scenes/dou_di_zhu/dou_di_zhu_table.tscn", "players": [3]},
 ]
 
 var page := Page.HOME
@@ -148,13 +150,17 @@ func _refresh() -> void:
 			title_label.text = I18n.t(GAMES[chosen_game]["title"])
 			players_label.text = I18n.t("players")
 			start_button.text = I18n.t("start")
-			var chosen := GameSettings.player_count()
+			var choices: Array = GAMES[chosen_game]["players"]
+			var chosen: int = GameSettings.player_count() if choices.size() > 1 else choices[0]
 			for count in count_buttons:
 				var button: Button = count_buttons[count]
+				button.visible = choices.has(count)
+				button.disabled = choices.size() == 1  # nothing to choose: shown for information
 				button.text = I18n.t("players_n") % count
 				button.button_pressed = count == chosen
 				button.add_theme_color_override("font_color", SELECTED_COLOR if count == chosen else Color.WHITE)
 				button.add_theme_color_override("font_pressed_color", SELECTED_COLOR)
+				button.add_theme_color_override("font_disabled_color", SELECTED_COLOR)
 
 
 func _on_game_pressed(index: int) -> void:

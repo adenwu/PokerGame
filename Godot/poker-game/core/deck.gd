@@ -1,13 +1,15 @@
 class_name Deck
 extends RefCounted
-## A standard 52-card deck.
+## A standard 52-card deck, optionally with the two jokers (54 cards).
 
 const SIZE := 52
 
 var cards: Array[Card] = []
+var with_jokers := false
 
 
-func _init() -> void:
+func _init(p_with_jokers: bool = false) -> void:
+	with_jokers = p_with_jokers
 	reset()
 
 
@@ -16,6 +18,9 @@ func reset() -> void:
 	for suit in Card.Suit.values():
 		for rank in range(1, 14):
 			cards.append(Card.new(rank, suit))
+	if with_jokers:
+		cards.append(Card.new(Card.SMALL_JOKER, Card.Suit.CLUBS))
+		cards.append(Card.new(Card.BIG_JOKER, Card.Suit.HEARTS))
 
 
 func shuffle(rng: RandomNumberGenerator = null) -> void:

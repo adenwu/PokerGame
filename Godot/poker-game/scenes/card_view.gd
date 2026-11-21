@@ -13,7 +13,11 @@ func setup(card: Card, card_size: Vector2) -> void:
 	pivot_offset = card_size * 0.5  # rotate and scale around the center
 	focus_mode = Control.FOCUS_NONE
 	alignment = HORIZONTAL_ALIGNMENT_LEFT  # overlapped hand cards only show their left edge
-	text = "%s\n%s" % [Card.RANK_NAMES[card.rank], SUIT_SYMBOLS[card.suit]]
+	if card.is_joker():
+		# Like real decks, the big joker is printed in colour and the small one in black.
+		text = "JK\n★" if card.rank == Card.BIG_JOKER else "JK\n☆"
+	else:
+		text = "%s\n%s" % [Card.RANK_NAMES[card.rank], SUIT_SYMBOLS[card.suit]]
 	add_theme_font_size_override("font_size", int(card_size.y * 0.24))
 
 	var is_red := card.suit == Card.Suit.DIAMONDS or card.suit == Card.Suit.HEARTS

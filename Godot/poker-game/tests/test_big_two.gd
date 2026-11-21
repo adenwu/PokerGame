@@ -132,7 +132,7 @@ func test_translations() -> void:
 
 
 func test_match() -> void:
-	var m := BigTwoMatch.new(4)
+	var m := ScoreSeries.new(4)
 	check(m.round_number() == 1 and m.last_round().is_empty(), "match starts at round 1")
 	check(m.leader() == -1, "no leader while everyone is tied")
 	var first: Array[int] = [60, -20, -10, -30]

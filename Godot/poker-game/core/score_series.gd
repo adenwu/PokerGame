@@ -1,6 +1,6 @@
-class_name BigTwoMatch
+class_name ScoreSeries
 extends RefCounted
-## A series of Big Two rounds with running totals. No UI: the table records
+## A series of rounds with running totals. No UI: the table records
 ## each finished round's score changes here.
 
 var player_count: int
