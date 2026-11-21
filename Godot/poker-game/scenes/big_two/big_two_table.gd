@@ -447,13 +447,14 @@ func _record_round_if_over() -> void:
 func _refresh_scoreboard() -> void:
 	# While a round is being played its number is round_number(); once recorded, it is the last one.
 	var shown_round := series.round_number() - (1 if round_recorded else 0)
-	var lines: Array[String] = [I18n.t("round") % shown_round, I18n.t("totals")]
+	# Kept to three short lines so it stays clear of the left player's fan.
+	var lines: Array[String] = ["%s · %s" % [I18n.t("round") % shown_round, I18n.t("totals")]]
 	var leader := series.leader()
+	var entries: Array[String] = []
 	for i in PLAYER_COUNT:
-		var line := "%s  %+d" % [I18n.t("seat_%d" % i), series.totals[i]]
-		if i == leader:
-			line += "  ★ " + I18n.t("leading")
-		lines.append(line)
+		entries.append("%s %+d%s" % [I18n.t("seat_%d" % i), series.totals[i], " ★" if i == leader else ""])
+	for i in range(0, entries.size(), 2):
+		lines.append("   ".join(entries.slice(i, i + 2)))
 	scoreboard_label.text = "\n".join(lines)
 
 
