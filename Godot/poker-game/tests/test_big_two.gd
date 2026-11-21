@@ -11,6 +11,7 @@ func _init() -> void:
 	test_five_card_order()
 	test_rules()
 	test_translations()
+	test_match()
 	test_simulated_games()
 	print("FAILED: %d" % failures if failures > 0 else "ALL PASSED")
 	quit(1 if failures > 0 else 0)
@@ -128,6 +129,28 @@ func test_translations() -> void:
 		check(english.has(key), "en has translation for '%s'" % key)
 	for type_index in BigTwoCombo.TYPE_NAMES.size():
 		check(english.has("type_%d" % type_index), "combo type %d is translated" % type_index)
+
+
+func test_match() -> void:
+	var m := BigTwoMatch.new(4)
+	check(m.round_number() == 1 and m.last_round().is_empty(), "match starts at round 1")
+	check(m.leader() == -1, "no leader while everyone is tied")
+	var first: Array[int] = [60, -20, -10, -30]
+	m.record(first)
+	var second: Array[int] = [-40, 90, -30, -20]
+	m.record(second)
+	var expected: Array[int] = [20, 70, -40, -50]
+	check(m.totals == expected, "totals add up across rounds")
+	check(m.round_number() == 3, "round number advances")
+	check(m.last_round() == second, "last round is remembered")
+	check(m.leader() == 1, "highest total leads")
+	var sum := 0
+	for t in m.totals:
+		sum += t
+	check(sum == 0, "totals stay zero-sum")
+	m.reset()
+	var zeros: Array[int] = [0, 0, 0, 0]
+	check(m.totals == zeros and m.round_number() == 1, "reset clears the match")
 
 
 func test_simulated_games() -> void:

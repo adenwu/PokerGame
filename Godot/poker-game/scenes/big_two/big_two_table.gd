@@ -27,6 +27,8 @@ const ACTIVE_COLOR := Color(1.0, 0.9, 0.3)
 const SEAT_FACING: Array[float] = [0.0, -PI / 2.0, PI, PI / 2.0]
 
 var game := BigTwoGame.new()
+var series := BigTwoMatch.new(PLAYER_COUNT)
+var round_recorded := false  # the finished round's scores were added to `series`
 var selected: Array[Card] = []
 var last_action_key := ""
 var last_action_args: Array = []
@@ -39,9 +41,11 @@ var table_views: Array = []  # cards currently shown in the middle
 var seat_labels: Array[Label] = []
 var last_play_label: Label
 var status_label: Label
+var scoreboard_label: Label
 var button_row: HBoxContainer
 var play_button: Button
 var pass_button: Button
+var next_round_button: Button
 var new_game_button: Button
 var language_button: Button
 var hand_layer: Control
@@ -85,7 +89,15 @@ func _build_ui() -> void:
 	add_child(button_row)
 	play_button = _make_button(_on_play_pressed)
 	pass_button = _make_button(_on_pass_pressed)
+	next_round_button = _make_button(_start_round)
 	new_game_button = _make_button(_start_game)
+
+	scoreboard_label = Label.new()
+	scoreboard_label.add_theme_font_size_override("font_size", 18)
+	scoreboard_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+	scoreboard_label.add_theme_constant_override("outline_size", 4)
+	scoreboard_label.position = Vector2(16, 12)
+	add_child(scoreboard_label)
 
 	language_button = Button.new()
 	language_button.custom_minimum_size = Vector2(110, 40)
@@ -209,8 +221,16 @@ func _move(node: Control, center: Vector2, target_rotation: float, target_scale:
 
 # --- Game flow --------------------------------------------------------------
 
+## New game: clears the running totals and deals round 1.
 func _start_game() -> void:
+	series.reset()
+	_start_round()
+
+
+## Deals the next round, keeping the running totals.
+func _start_round() -> void:
 	run_id += 1
+	round_recorded = false
 	selected.clear()
 	_set_action("")
 	game.start(PLAYER_COUNT)
@@ -371,7 +391,9 @@ func _set_action(key: String, args: Array = []) -> void:
 
 
 func _refresh() -> void:
+	_record_round_if_over()
 	_refresh_table()
+	_refresh_scoreboard()
 	_refresh_controls()
 
 
@@ -393,11 +415,15 @@ func _refresh_controls() -> void:
 	play_button.text = I18n.t("play")
 	pass_button.text = I18n.t("pass")
 	new_game_button.text = I18n.t("new_game")
+	next_round_button.text = I18n.t("next_round")
 	language_button.text = I18n.t("language_button")
 
 	var my_turn := not game.is_over() and game.current_player == HUMAN
 	play_button.disabled = not my_turn or selected.is_empty()
 	pass_button.disabled = not my_turn or game.last_combo == null
+	play_button.visible = not game.is_over()
+	pass_button.visible = not game.is_over()
+	next_round_button.visible = game.is_over()
 
 	var action := ""
 	if not last_action_key.is_empty():
@@ -410,6 +436,25 @@ func _refresh_controls() -> void:
 	else:
 		second_line = I18n.t("thinking") % I18n.t("seat_%d" % game.current_player)
 	status_label.text = "%s\n%s" % [action, second_line]
+
+
+func _record_round_if_over() -> void:
+	if game.is_over() and not round_recorded:
+		series.record(game.scores())
+		round_recorded = true
+
+
+func _refresh_scoreboard() -> void:
+	# While a round is being played its number is round_number(); once recorded, it is the last one.
+	var shown_round := series.round_number() - (1 if round_recorded else 0)
+	var lines: Array[String] = [I18n.t("round") % shown_round, I18n.t("totals")]
+	var leader := series.leader()
+	for i in PLAYER_COUNT:
+		var line := "%s  %+d" % [I18n.t("seat_%d" % i), series.totals[i]]
+		if i == leader:
+			line += "  ★ " + I18n.t("leading")
+		lines.append(line)
+	scoreboard_label.text = "\n".join(lines)
 
 
 func _result_text() -> String:

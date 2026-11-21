@@ -56,6 +56,21 @@ func _initialize() -> void:
 	await create_timer(0.8).timeout
 	check(table.hand_views.size() == table.game.hand_of(0).size(), "new game deals a fresh hand")
 
+	# Finishing a round records it once; the next round keeps totals, a new game clears them.
+	table.game.winner = 1
+	table._refresh()
+	table._refresh()
+	check(table.series.history.size() == 1, "finished round recorded exactly once")
+	check(table.next_round_button.visible and not table.play_button.visible, "next round button replaces play")
+	var totals_after: Array[int] = table.series.totals.duplicate()
+	table._start_round()
+	await create_timer(0.8).timeout
+	check(table.series.totals == totals_after, "next round keeps the totals")
+	check(table.series.round_number() == 2, "round counter advanced")
+	check(not table.next_round_button.visible or table.game.is_over(), "next round button hidden while playing")
+	table._start_game()
+	check(table.series.history.is_empty(), "new game clears the totals")
+
 	print("FAILED: %d" % failures if failures > 0 else "ALL PASSED")
 	quit(1 if failures > 0 else 0)
 
